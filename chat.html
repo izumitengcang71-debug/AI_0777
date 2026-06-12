@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CharaChat - 会話</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{--accent:#9933ff;--accent-dark:#6600cc;--dark:#0d0d0d;--card-bg:#1a1a1a;--muted:#888;}
+*{box-sizing:border-box;}
+body{background:var(--dark);color:#eee;font-family:'Hiragino Sans','Noto Sans JP',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ナビバー */
+.navbar{background:rgba(10,10,10,.95);border-bottom:1px solid #2a2a2a;display:flex;align-items:center;padding:0 12px;height:52px;flex-shrink:0;}
+.nav-back{background:none;border:none;color:#aaa;font-size:1.2rem;cursor:pointer;padding:6px;border-radius:6px;}
+.nav-back:hover{background:#222;color:#eee;}
+.nav-chara-name{flex:1;text-align:center;font-size:.9rem;font-weight:700;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px;}
+.nav-menu-btn{background:none;border:none;color:#aaa;font-size:1.2rem;cursor:pointer;padding:6px;border-radius:6px;}
+.nav-menu-btn:hover{background:#222;color:#eee;}
+
+/* チャットラッパー */
+.chat-wrapper{display:flex;flex:1;overflow:hidden;}
+
+/* サイドバー */
+.sidebar{width:240px;flex-shrink:0;background:#111;border-right:1px solid #2a2a2a;display:flex;flex-direction:column;padding:20px 14px;overflow-y:auto;}
+.chara-avatar{width:80px;height:80px;background:linear-gradient(135deg,#2a003a,#1a1a1a);border:2px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 12px;overflow:hidden;}
+.chara-name{text-align:center;font-size:1rem;font-weight:700;color:#eee;}
+.chara-desc{font-size:.78rem;color:#888;text-align:center;margin-top:8px;line-height:1.5;}
+.tag{display:inline-block;font-size:.68rem;color:var(--accent);background:#2a003a;border:1px solid #6600cc;border-radius:12px;padding:2px 8px;margin:2px;}
+.tag-area{text-align:center;margin-top:10px;}
+.sidebar-divider{border-top:1px solid #2a2a2a;margin:14px 0;}
+.back-link{display:block;text-align:center;font-size:.8rem;color:#666;text-decoration:none;padding:6px;border-radius:8px;}
+.back-link:hover{color:var(--accent);background:#1a1a1a;}
+.sidebar-btn{width:100%;margin-top:6px;background:#1a1a1a;border:1px solid #333;color:#888;border-radius:8px;font-size:.78rem;padding:8px 10px;cursor:pointer;text-align:left;}
+.sidebar-btn:hover{background:#2a2a2a;color:#eee;}
+.sidebar-btn.danger{border-color:#550022;color:#ff5577;}
+.sidebar-btn.danger:hover{background:#2a0010;}
+
+/* チャットエリア */
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.messages{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:14px;}
+.messages::-webkit-scrollbar{width:4px;}
+.messages::-webkit-scrollbar-thumb{background:#333;border-radius:4px;}
+
+/* 吹き出し */
+.msg{display:flex;gap:10px;max-width:78%;animation:fadeUp .2s ease;position:relative;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.msg.ai{align-self:flex-start;}
+.msg.ai .bubble{background:var(--card-bg);border:1px solid #2a2a2a;color:#eee;border-radius:4px 16px 16px 16px;}
+.msg-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2a003a,#1a1a1a);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;overflow:hidden;cursor:pointer;}
+.msg-avatar img{width:100%;height:100%;object-fit:cover;object-position:top;}
+.msg.user{align-self:flex-end;flex-direction:row-reverse;}
+.msg.user .bubble{background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border-radius:16px 4px 16px 16px;}
+.bubble{padding:10px 14px;font-size:.9rem;line-height:1.65;word-break:break-word;}
+.bubble .action{color:#aaa;font-style:italic;}
+
+/* 削除ボタン */
+.msg-del-btn{display:none;position:absolute;top:-8px;right:-8px;background:#ff3b30;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.65rem;align-items:center;justify-content:center;cursor:pointer;z-index:10;}
+.msg:hover .msg-del-btn{display:flex;}
+.msg.user .msg-del-btn{right:auto;left:-8px;}
+
+/* コンテキストメニュー */
+.ctx-menu{position:fixed;background:#1e1e1e;border:1px solid #333;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:1000;min-width:160px;overflow:hidden;display:none;}
+.ctx-menu.show{display:block;}
+.ctx-item{padding:11px 16px;font-size:.85rem;color:#eee;cursor:pointer;display:flex;align-items:center;gap:10px;}
+.ctx-item:hover{background:#2a2a2a;}
+.ctx-item.danger{color:#ff5577;}
+.ctx-item.danger:hover{background:#2a0010;}
+.ctx-divider{border-top:1px solid #2a2a2a;}
+
+/* タイピング */
+.typing-dots span{display:inline-block;width:6px;height:6px;background:#888;border-radius:50%;margin:0 2px;animation:blink 1.2s infinite;}
+.typing-dots span:nth-child(2){animation-delay:.2s;}
+.typing-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2;transform:scale(.8);}40%{opacity:1;transform:scale(1);}}
+
+/* ウェルカム */
+.welcome{text-align:center;color:#444;font-size:.85rem;margin:auto;padding:40px 20px;}
+.welcome-icon{font-size:2.5rem;margin-bottom:12px;}
+.welcome-img-wrap{width:120px;height:120px;border-radius:50%;overflow:hidden;margin:0 auto 12px;border:2px solid var(--accent);}
+.welcome-img-wrap img{width:100%;height:100%;object-fit:cover;object-position:top;}
+
+/* 入力エリア */
+.input-area{padding:10px 12px;border-top:1px solid #2a2a2a;background:#0f0f0f;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+.ast-btn{width:36px;height:36px;flex-shrink:0;background:#1a1a1a;border:1px solid #444;border-radius:10px;color:#aaa;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.ast-btn:hover{background:#2a2a2a;color:#fff;}
+.msg-input{flex:1;background:#1a1a1a;border:1px solid #333;color:#eee;border-radius:12px;font-size:.9rem;padding:10px 14px;resize:none;outline:none;min-height:44px;max-height:120px;line-height:1.5;font-family:inherit;}
+.msg-input:focus{border-color:var(--accent);}
+.msg-input::placeholder{color:#555;}
+.send-btn{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border:none;border-radius:12px;color:#fff;font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s,opacity .15s;flex-shrink:0;}
+.send-btn:hover:not(:disabled){transform:scale(1.05);}
+.send-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* チャットメニュー */
+.menu-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;}
+.menu-overlay.show{display:block;}
+.menu-panel{position:fixed;top:0;right:-280px;width:260px;height:100vh;background:#111;border-left:1px solid #2a2a2a;z-index:201;transition:right .25s ease;display:flex;flex-direction:column;padding:20px 14px;}
+.menu-panel.show{right:0;}
+.menu-title{font-size:1rem;font-weight:700;margin-bottom:14px;color:#eee;}
+.menu-btn{display:flex;align-items:center;gap:10px;padding:12px 12px;border-radius:10px;cursor:pointer;font-size:.88rem;color:#ccc;border:none;background:none;width:100%;text-align:left;margin-bottom:3px;}
+.menu-btn:hover{background:#1e1e1e;color:#fff;}
+.menu-btn.danger{color:#ff5577;}
+.menu-btn.danger:hover{background:#2a0010;}
+.menu-icon{font-size:1.1rem;width:22px;text-align:center;}
+.menu-sep{border-top:1px solid #2a2a2a;margin:8px 0;}
+
+/* トークプロフィール モーダル */
+.tp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;}
+.tp-overlay.show{display:block;}
+.tp-modal{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;background:#111;border-radius:20px 20px 0 0;border-top:1px solid #2a2a2a;z-index:301;padding:0 0 40px;max-height:80vh;overflow-y:auto;display:none;}
+.tp-modal.show{display:block;}
+.tp-modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px;border-bottom:1px solid #2a2a2a;}
+.tp-modal-title{font-size:.95rem;font-weight:700;color:#eee;}
+.tp-modal-close{background:none;border:none;color:#666;font-size:1.2rem;cursor:pointer;}
+.tp-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid #1a1a1a;}
+.tp-item:hover{background:#1a1a1a;}
+.tp-item.active-item{background:#2a003a;}
+.tp-avatar{width:44px;height:44px;border-radius:50%;background:#2a2a2a;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;overflow:hidden;border:2px solid #333;}
+.tp-avatar img{width:100%;height:100%;object-fit:cover;}
+.tp-info{flex:1;min-width:0;}
+.tp-name{font-size:.88rem;font-weight:700;color:#eee;}
+.tp-desc{font-size:.72rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.tp-check{color:var(--accent);font-size:1.1rem;}
+.tp-add-btn{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;color:var(--accent);font-size:.88rem;}
+.tp-add-icon{width:44px;height:44px;border-radius:50%;background:#2a003a;display:flex;align-items:center;justify-content:center;font-size:1.4rem;border:2px solid #6600cc;flex-shrink:0;}
+
+/* 画像モーダル */
+.img-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:999;align-items:center;justify-content:center;cursor:pointer;}
+.img-modal.show{display:flex;}
+.img-modal img{max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;}
+.img-modal-close{position:absolute;top:16px;right:16px;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:1.5rem;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* トースト */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:#eee;font-size:.82rem;padding:10px 20px;border-radius:20px;opacity:0;transition:opacity .3s;z-index:500;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;}
+
+/* エラーバナー */
+.error-banner{background:#2a0010;border:1px solid #550022;color:#ff8888;font-size:.8rem;padding:10px 16px;text-align:center;display:none;}
+.error-banner.show{display:block;}
+
+@media(max-width:640px){.sidebar{display:none;}.chat-main{width:100%;}}
+</style>
+</head>
+<body>
+
+<!-- ナビバー -->
+<nav class="navbar">
+  <button class="nav-back" onclick="history.back()">←</button>
+  <div class="nav-chara-name" id="nav-name"></div>
+  <button class="nav-menu-btn" onclick="openMenu()">☰</button>
+</nav>
+
+<!-- エラーバナー（サーバーエラー時のみ表示） -->
+<div class="error-banner" id="error-banner"></div>
+
+<div class="chat-wrapper">
+  <!-- サイドバー -->
+  <div class="sidebar">
+    <div class="chara-avatar" id="side-avatar">
+      <span id="side-emoji">🎭</span>
+    </div>
+    <div class="chara-name" id="side-name">-</div>
+    <div class="chara-desc" id="side-desc"></div>
+    <div class="tag-area" id="side-tags"></div>
+    <div class="sidebar-divider"></div>
+    <a href="index.html" class="back-link">← キャラ一覧に戻る</a>
+    <div style="margin-top:12px;font-size:.72rem;color:#555;font-weight:600;margin-bottom:4px;">メニュー</div>
+    <button class="sidebar-btn" onclick="exportText()">💾 会話をテキスト保存</button>
+    <button class="sidebar-btn" onclick="exportImage()">📸 会話を画像で保存</button>
+    <button class="sidebar-btn danger" onclick="clearHistory()">🗑 会話履歴を削除</button>
+  </div>
+
+  <!-- チャットメイン -->
+  <div class="chat-main">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome-msg">
+        <div class="welcome-icon" id="welcome-icon">🎭</div>
+        <div id="welcome-img-outer" style="display:none;">
+          <div class="welcome-img-wrap"><img id="welcome-img" src="" alt=""></div>
+        </div>
+        <div id="welcome-text">キャラを選んで会話を始めよう</div>
+      </div>
+    </div>
+    <div class="input-area">
+      <button class="ast-btn" onclick="insertAsterisk()" title="＊を挿入">＊</button>
+      <textarea class="msg-input" id="msg-input" placeholder="メッセージを入力..." rows="1"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()" title="送信">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- チャットメニュー -->
+<div class="menu-overlay" id="menu-overlay" onclick="closeMenu()"></div>
+<div class="menu-panel" id="menu-panel">
+  <div class="menu-title">メニュー</div>
+  <button class="menu-btn" onclick="exportText();closeMenu()"><span class="menu-icon">💾</span>テキストで保存</button>
+  <button class="menu-btn" onclick="exportImage();closeMenu()"><span class="menu-icon">📸</span>画像で保存</button>
+  <button class="menu-btn" onclick="shareChat();closeMenu()"><span class="menu-icon">🔗</span>会話内容をコピー</button>
+  <div class="menu-sep"></div>
+  <button class="menu-btn" onclick="openTpModal();closeMenu()">
+    <span class="menu-icon">👤</span>トークプロフィール
+    <span id="tp-active-label" style="margin-left:auto;font-size:.75rem;color:#888;"></span>
+  </button>
+  <div class="menu-sep"></div>
+  <button class="menu-btn danger" onclick="clearHistory();closeMenu()"><span class="menu-icon">🗑</span>会話履歴を削除</button>
+  <a href="index.html" class="menu-btn" style="text-decoration:none;color:#ccc;"><span class="menu-icon">🏠</span>ホームへ戻る</a>
+</div>
+
+<!-- コンテキストメニュー -->
+<div class="ctx-menu" id="ctx-menu">
+  <div class="ctx-item" id="ctx-copy">📋 このメッセージをコピー</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item danger" id="ctx-delete">🗑 このメッセージを削除</div>
+</div>
+
+<!-- トークプロフィール モーダル -->
+<div class="tp-overlay" id="tp-overlay" onclick="closeTpModal()"></div>
+<div class="tp-modal" id="tp-modal">
+  <div class="tp-modal-header">
+    <span class="tp-modal-title">マイトークプロフィール</span>
+    <button class="tp-modal-close" onclick="closeTpModal()">✕</button>
+  </div>
+  <div class="tp-add-btn" onclick="goNewTalkProfile()">
+    <div class="tp-add-icon">＋</div>
+    <span>トークプロフィールを追加</span>
+  </div>
+  <div id="tp-list"></div>
+</div>
+
+<!-- 画像モーダル -->
+<div class="img-modal" id="img-modal" onclick="closeImgModal()">
+  <button class="img-modal-close" onclick="closeImgModal()">✕</button>
+  <img id="img-modal-src" src="" alt="">
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="chars.js"></script>
+<script>
+// ================================
+// 初期化
+// ================================
+const params = new URLSearchParams(location.search);
+const charId = params.get('id');
+let currentChar = null;
+let chatHistory = [];
+let isLoading = false;
+let ctxTargetEl = null;
+let ctxTargetText = '';
+
+function init() {
+  updateTpLabel();
+  if (!charId) return;
+  const all = getAllChars();
+  currentChar = all[charId];
+  if (!currentChar) return;
+
+  initCharDisplay();
+
+  try {
+    const saved = localStorage.getItem('chat_history_' + charId);
+    if (saved) chatHistory = JSON.parse(saved);
+  } catch(e) { chatHistory = []; }
+
+  if (chatHistory.length > 0) {
+    document.getElementById('welcome-msg').remove();
+    chatHistory.forEach((msg, i) => appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, i));
+  } else if (currentChar.intro) {
+    document.getElementById('welcome-msg').remove();
+    appendMessage('ai', currentChar.intro, 0);
+    chatHistory.push({ role: 'assistant', content: currentChar.intro });
+    saveHistory();
+  }
+}
+
+function initCharDisplay() {
+  const c = currentChar;
+  document.title = 'CharaChat - ' + c.name;
+  document.getElementById('nav-name').textContent = c.name + ' と会話中';
+  document.getElementById('side-name').textContent = c.name;
+  document.getElementById('side-desc').textContent = c.desc || '';
+
+  const sideAv = document.getElementById('side-avatar');
+  const sideEmoji = document.getElementById('side-emoji');
+  if (c.img) {
+    sideEmoji.style.display = 'none';
+    const img = document.createElement('img');
+    img.src = c.img;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:top;';
+    sideAv.appendChild(img);
+  } else {
+    sideEmoji.textContent = c.emoji || '🎭';
+  }
+
+  const tagArea = document.getElementById('side-tags');
+  tagArea.innerHTML = (c.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+
+  if (c.img) {
+    document.getElementById('welcome-icon').style.display = 'none';
+    document.getElementById('welcome-img-outer').style.display = 'block';
+    document.getElementById('welcome-img').src = c.img;
+  } else {
+    document.getElementById('welcome-icon').textContent = c.emoji || '🎭';
+  }
+  document.getElementById('welcome-text').textContent = c.name + ' との会話を始めよう';
+}
+
+function saveHistory() {
+  try { localStorage.setItem('chat_history_' + charId, JSON.stringify(chatHistory.slice(-60))); } catch(e) {}
+}
+
+// ================================
+// メッセージ追加
+// ================================
+function appendMessage(role, text, historyIdx) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.dataset.idx = historyIdx ?? chatHistory.length;
+
+  const isAI = role === 'ai';
+
+  if (isAI) {
+    const av = document.createElement('div');
+    av.className = 'msg-avatar';
+    if (currentChar?.img) {
+      av.onclick = () => openImgModal(currentChar.img);
+      const img = document.createElement('img');
+      img.src = currentChar.img; img.alt = '';
+      av.appendChild(img);
+    } else {
+      av.textContent = currentChar?.emoji || '🎭';
+    }
+    div.appendChild(av);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = formatText(text);
+  div.appendChild(bubble);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'msg-del-btn';
+  delBtn.textContent = '✕';
+  delBtn.onclick = (e) => { e.stopPropagation(); deleteMsg(div); };
+  div.appendChild(delBtn);
+
+  // 長押し
+  let pressTimer = null;
+  div.addEventListener('pointerdown', e => { pressTimer = setTimeout(() => showCtxMenu(e, div, text), 500); });
+  div.addEventListener('pointerup', () => clearTimeout(pressTimer));
+  div.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+  div.addEventListener('contextmenu', e => { e.preventDefault(); showCtxMenu(e, div, text); });
+
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function formatText(str) {
+  return str
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>')
+    .replace(/\*([^*\n]+)\*/g,'<span class="action">*$1*</span>');
+}
+
+// ================================
+// メッセージ削除
+// ================================
+function deleteMsg(el) {
+  const idx = parseInt(el.dataset.idx);
+  if (!isNaN(idx) && idx >= 0 && idx < chatHistory.length) {
+    chatHistory.splice(idx, 1);
+    saveHistory();
+  }
+  rebuildMessages();
+  showToast('削除しました');
+}
+
+function rebuildMessages() {
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  if (chatHistory.length === 0) {
+    if (currentChar?.intro) {
+      appendMessage('ai', currentChar.intro, 0);
+      chatHistory.push({ role: 'assistant', content: currentChar.intro });
+      saveHistory();
+    }
+    return;
+  }
+  chatHistory.forEach((msg, i) => appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, i));
+}
+
+// ================================
+// コンテキストメニュー
+// ================================
+function showCtxMenu(e, el, text) {
+  ctxTargetEl = el; ctxTargetText = text;
+  const menu = document.getElementById('ctx-menu');
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+  menu.style.top  = Math.min(e.clientY, window.innerHeight - 100) + 'px';
+  menu.classList.add('show');
+  document.getElementById('ctx-copy').onclick = () => {
+    navigator.clipboard?.writeText(text).catch(() => {});
+    showToast('コピーしました'); closeCtxMenu();
+  };
+  document.getElementById('ctx-delete').onclick = () => {
+    if (ctxTargetEl) deleteMsg(ctxTargetEl); closeCtxMenu();
+  };
+}
+function closeCtxMenu() { document.getElementById('ctx-menu').classList.remove('show'); ctxTargetEl = null; }
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtxMenu(); closeMenu(); } });
+
+// ================================
+// メニュー
+// ================================
+function openMenu() {
+  document.getElementById('menu-overlay').classList.add('show');
+  document.getElementById('menu-panel').classList.add('show');
+}
+function closeMenu() {
+  document.getElementById('menu-overlay').classList.remove('show');
+  document.getElementById('menu-panel').classList.remove('show');
+}
+
+// ================================
+// 送信 → /api/chat を叩く（APIキーはサーバー側）
+// ================================
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !currentChar) return;
+
+  const wm = document.getElementById('welcome-msg');
+  if (wm) wm.remove();
+  hideError();
+
+  const userIdx = chatHistory.length;
+  appendMessage('user', text, userIdx);
+  chatHistory.push({ role: 'user', content: text });
+  saveHistory();
+  input.value = '';
+  autoResize(input);
+
+  const typingId = addTyping();
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+
+  try {
+    // トークプロフィールを取得してシステムプロンプトに付加
+    let systemPrompt = currentChar.system || '';
+    try {
+      const tp = JSON.parse(localStorage.getItem('active_talk_profile') || 'null');
+      const prof = JSON.parse(localStorage.getItem('my_profile') || 'null');
+      const userName = tp?.name || prof?.name || 'あなた';
+      systemPrompt = systemPrompt.replace(/{{user}}/g, userName);
+      if (tp?.desc) systemPrompt += '\n\n【ユーザープロフィール】\n名前: ' + tp.name + '\n' + tp.desc;
+    } catch(e) {}
+
+    // ★ /api/chat を叩く。APIキーはサーバー側で管理
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt,
+        messages: chatHistory.slice(-20),
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    removeTyping(typingId);
+    const aiIdx = chatHistory.length;
+    appendMessage('ai', data.reply, aiIdx);
+    chatHistory.push({ role: 'assistant', content: data.reply });
+    saveHistory();
+
+    if (charId) {
+      localStorage.setItem('talk_count_' + charId, getTalkCount(charId) + 1);
+    }
+
+  } catch(err) {
+    removeTyping(typingId);
+    showError('⚠️ ' + (err.message || '送信に失敗しました。時間をおいて再試行してください。'));
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+  input.focus();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+function hideError() { document.getElementById('error-banner').classList.remove('show'); }
+
+// ================================
+// タイピング
+// ================================
+function addTyping() {
+  const msgs = document.getElementById('messages');
+  const id = 'typing-' + Date.now();
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = id;
+  if (currentChar?.img) {
+    const av = document.createElement('div');
+    av.className = 'msg-avatar';
+    av.onclick = () => openImgModal(currentChar.img);
+    const img = document.createElement('img');
+    img.src = currentChar.img; av.appendChild(img);
+    div.appendChild(av);
+  } else {
+    const av = document.createElement('div');
+    av.className = 'msg-avatar';
+    av.textContent = currentChar?.emoji || '🎭';
+    div.appendChild(av);
+  }
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  b.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  div.appendChild(b);
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return id;
+}
+function removeTyping(id) { document.getElementById(id)?.remove(); }
+
+// ================================
+// ユーティリティ
+// ================================
+function insertAsterisk() {
+  const inp = document.getElementById('msg-input');
+  const s = inp.selectionStart, e = inp.selectionEnd;
+  inp.value = inp.value.slice(0,s) + '*' + inp.value.slice(e);
+  inp.selectionStart = inp.selectionEnd = s + 1;
+  inp.focus(); autoResize(inp);
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+const msgInput = document.getElementById('msg-input');
+msgInput.addEventListener('input', () => autoResize(msgInput));
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// ================================
+// エクスポート
+// ================================
+function clearHistory() {
+  if (!confirm('会話履歴を削除しますか？')) return;
+  chatHistory = [];
+  if (charId) localStorage.removeItem('chat_history_' + charId);
+  rebuildMessages();
+  showToast('削除しました');
+}
+function exportText() {
+  if (!chatHistory.length) { showToast('会話がまだありません'); return; }
+  const name = currentChar?.name || 'キャラ';
+  const lines = chatHistory.map(m => `[${m.role==='user'?'あなた':name}]\n${m.content}`).join('\n\n');
+  const blob = new Blob([`【CharaChat - ${name}】\n${new Date().toLocaleString('ja-JP')}\n${'─'.repeat(30)}\n\n` + lines], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `charaChat_${name}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  showToast('保存しました');
+}
+async function exportImage() {
+  if (!chatHistory.length) { showToast('会話がまだありません'); return; }
+  showToast('画像を生成中...');
+  try {
+    const canvas = await html2canvas(document.getElementById('messages'), {backgroundColor:'#0d0d0d',scale:2,useCORS:true,allowTaint:true,logging:false});
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `charaChat_${currentChar?.name||'chat'}_${new Date().toISOString().slice(0,10)}.png`;
+    a.click();
+    showToast('画像を保存しました！');
+  } catch(e) { showToast('画像の生成に失敗しました'); }
+}
+function shareChat() {
+  if (!chatHistory.length) { showToast('会話がまだありません'); return; }
+  const name = currentChar?.name || 'キャラ';
+  const text = chatHistory.map(m => `[${m.role==='user'?'あなた':name}] ${m.content}`).join('\n\n');
+  navigator.clipboard?.writeText(text).then(() => showToast('コピーしました')).catch(() => showToast('コピー失敗'));
+}
+
+// ================================
+// トークプロフィール
+// ================================
+function openTpModal() {
+  const profiles = loadTpProfiles();
+  const active = getActiveTp();
+  const list = document.getElementById('tp-list');
+  list.innerHTML = profiles.map((p,i) => {
+    const isA = active && active.id === p.id;
+    const av = p.avatar ? `<div class="tp-avatar"><img src="${p.avatar}" alt=""></div>` : `<div class="tp-avatar">👤</div>`;
+    return `<div class="tp-item${isA?' active-item':''}" onclick="selectTp(${i})">${av}<div class="tp-info"><div class="tp-name">${p.name}</div><div class="tp-desc">${p.desc||''}</div></div>${isA?'<span class="tp-check">✓</span>':''}</div>`;
+  }).join('') || '<div style="padding:20px;text-align:center;color:#555;font-size:.82rem;">プロフィールなし</div>';
+  document.getElementById('tp-overlay').classList.add('show');
+  document.getElementById('tp-modal').classList.add('show');
+}
+function closeTpModal() {
+  document.getElementById('tp-overlay').classList.remove('show');
+  document.getElementById('tp-modal').classList.remove('show');
+}
+function loadTpProfiles() { try { return JSON.parse(localStorage.getItem('talk_profiles')||'[]'); } catch(e) { return []; } }
+function getActiveTp() { try { return JSON.parse(localStorage.getItem('active_talk_profile')||'null'); } catch(e) { return null; } }
+function selectTp(i) {
+  const profiles = loadTpProfiles();
+  if (i >= 0 && i < profiles.length) localStorage.setItem('active_talk_profile', JSON.stringify(profiles[i]));
+  updateTpLabel(); closeTpModal(); showToast('プロフィールを設定しました');
+}
+function updateTpLabel() {
+  const p = getActiveTp();
+  const el = document.getElementById('tp-active-label');
+  if (el) el.textContent = p ? p.name : '未設定';
+}
+function goNewTalkProfile() { closeTpModal(); location.href = 'index.html?action=new_talk_profile'; }
+
+// ================================
+// 画像モーダル
+// ================================
+function openImgModal(src) { document.getElementById('img-modal-src').src = src; document.getElementById('img-modal').classList.add('show'); }
+function closeImgModal() { document.getElementById('img-modal').classList.remove('show'); }
+
+// ================================
+// トースト
+// ================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+init();
+</script>
+</body>
+</html>

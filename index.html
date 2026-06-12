@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>CharaChat</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d0d0d;color:#eee;font-family:'Hiragino Sans','Noto Sans JP',sans-serif;width:390px;min-height:100vh;margin:0 auto;display:flex;flex-direction:column;overflow-x:hidden;}
+
+/* ページ切り替え */
+.pages{flex:1;overflow:hidden;position:relative;}
+.page{display:none;flex-direction:column;background:#0d0d0d;min-height:calc(100vh - 60px);overflow-y:auto;scrollbar-width:none;}
+.page::-webkit-scrollbar{display:none;}
+.page.active{display:flex;}
+
+/* タブバー */
+.tab-bar{position:fixed;bottom:0;width:390px;left:50%;transform:translateX(-50%);height:60px;background:#111;border-top:1px solid #222;display:flex;z-index:100;}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#555;font-size:.62rem;border:none;background:none;transition:color .2s;position:relative;}
+.tab-item.active{color:#fff;}
+.tab-icon{font-size:1.25rem;line-height:1;}
+.tab-badge{position:absolute;top:6px;right:calc(50% - 18px);background:#ff3b30;color:#fff;font-size:.55rem;font-weight:700;border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;}
+
+/* 共通ヘッダー */
+.page-header{padding:14px 16px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.header-title-row{display:flex;align-items:center;gap:16px;}
+.header-title{font-size:1.4rem;font-weight:800;color:#eee;}
+.header-title.inactive{color:#555;font-size:1.1rem;font-weight:600;cursor:pointer;}
+.header-icon-btn{width:34px;height:34px;background:none;border:none;color:#888;font-size:1.1rem;cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.header-icon-btn:hover{background:#1a1a1a;}
+
+/* ── ホーム（ランキング） ── */
+.rank-subtabs{display:flex;gap:0;padding:10px 16px 0;}
+.rank-subtab{font-size:.9rem;font-weight:700;color:#555;padding:6px 14px 6px 0;cursor:pointer;border-bottom:2px solid transparent;}
+.rank-subtab.active{color:#fff;border-bottom-color:#9933ff;}
+.gender-filter{display:flex;align-items:center;gap:4px;font-size:.78rem;color:#888;cursor:pointer;background:none;border:none;padding:0;margin-left:auto;}
+
+.genre-scroll{display:flex;gap:6px;padding:10px 16px 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+.genre-scroll::-webkit-scrollbar{display:none;}
+.genre-chip{font-size:.75rem;font-weight:600;padding:5px 14px;border-radius:20px;cursor:pointer;white-space:nowrap;background:#1e1e1e;color:#aaa;border:1px solid #2a2a2a;}
+.genre-chip.active{background:#9933ff;color:#fff;border-color:#9933ff;}
+
+/* ランキングカードグリッド */
+.rank-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:6px 10px 80px;}
+.rank-card{background:#1a1a1a;border-radius:10px;overflow:hidden;cursor:pointer;position:relative;}
+.rank-card:active{opacity:.85;}
+.rank-card-img{width:100%;height:200px;object-fit:cover;object-position:top;display:block;}
+.rank-card-emoji{width:100%;height:200px;background:linear-gradient(135deg,#1a0030,#0d0d0d);display:flex;align-items:center;justify-content:center;font-size:3rem;}
+.rank-num{position:absolute;top:8px;left:10px;font-size:.8rem;font-weight:900;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.8);}
+.rank-talk-count{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:.68rem;padding:2px 7px;border-radius:10px;display:flex;align-items:center;gap:3px;}
+.rank-card-body{padding:8px 10px 10px;}
+.rank-card-name{font-size:.85rem;font-weight:700;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.rank-card-desc{font-size:.7rem;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.rank-card-tags{font-size:.62rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-tag-chip{display:inline-block;color:#9933ff;background:#1a0025;border:1px solid #4400aa;border-radius:10px;padding:1px 5px;margin-right:2px;font-size:.6rem;}
+.rank-card-author{font-size:.62rem;color:#666;margin-top:2px;}
+
+/* ドロップダウン */
+.dropdown-overlay{display:none;position:fixed;inset:0;z-index:150;}
+.dropdown-overlay.show{display:block;}
+.dropdown-menu{position:fixed;background:#1e1e1e;border:1px solid #333;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:151;min-width:130px;overflow:hidden;}
+.dropdown-item{padding:14px 18px;font-size:.88rem;color:#eee;cursor:pointer;transition:background .12s;}
+.dropdown-item:hover{background:#2a2a2a;}
+.dropdown-item.active{color:#9933ff;font-weight:700;}
+
+/* ── トーク ── */
+.talk-saved-section{padding:10px 0 6px 14px;}
+.talk-saved-label{font-size:.72rem;color:#666;font-weight:600;margin-bottom:8px;}
+.talk-saved-scroll{display:flex;gap:10px;padding-right:14px;overflow-x:auto;scrollbar-width:none;}
+.talk-saved-scroll::-webkit-scrollbar{display:none;}
+.talk-saved-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;}
+.talk-saved-avatar{width:56px;height:56px;border-radius:10px;overflow:hidden;border:2px solid #2a2a2a;}
+.talk-saved-avatar img{width:100%;height:100%;object-fit:cover;object-position:top;}
+.talk-saved-name{font-size:.62rem;color:#888;max-width:60px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.sort-bar{padding:8px 16px;display:flex;align-items:center;gap:4px;font-size:.78rem;color:#888;cursor:pointer;border-top:1px solid #1a1a1a;}
+
+.talk-list-items{display:flex;flex-direction:column;}
+.talk-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid #111;}
+.talk-item:active{background:#111;}
+.talk-avatar{width:54px;height:54px;border-radius:50%;overflow:hidden;flex-shrink:0;border:1px solid #2a2a2a;}
+.talk-avatar img{width:100%;height:100%;object-fit:cover;object-position:top;}
+.talk-avatar-emoji{width:54px;height:54px;border-radius:50%;background:#1a1a1a;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;}
+.talk-info{flex:1;min-width:0;}
+.talk-name{font-size:.88rem;font-weight:700;color:#eee;margin-bottom:2px;}
+.talk-preview{font-size:.75rem;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.talk-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.talk-time{font-size:.65rem;color:#444;}
+.unread-badge{background:#9933ff;color:#fff;font-size:.6rem;font-weight:700;border-radius:8px;padding:2px 6px;min-width:18px;text-align:center;}
+
+/* ── 作成 ── */
+.create-header{padding:14px 16px 0;display:flex;align-items:center;}
+.create-title-tabs{display:flex;gap:14px;}
+.create-title-tab{font-size:1.4rem;font-weight:800;cursor:pointer;color:#555;}
+.create-title-tab.active{color:#eee;}
+.create-stats-bar{margin:10px 14px 0;background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:12px 14px;}
+.create-stats-label{font-size:.7rem;color:#555;margin-bottom:2px;}
+.create-stats-main{font-size:.9rem;font-weight:700;color:#eee;}
+.create-stats-main span{color:#4caf50;}
+.create-pub-tabs{display:flex;gap:0;padding:10px 14px 0;border-bottom:1px solid #1a1a1a;}
+.create-pub-tab{font-size:.82rem;font-weight:600;color:#555;padding:6px 12px 8px 0;cursor:pointer;border-bottom:2px solid transparent;margin-right:8px;}
+.create-pub-tab.active{color:#fff;border-bottom-color:#9933ff;}
+
+.plot-list{display:flex;flex-direction:column;padding-bottom:80px;}
+.plot-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #111;cursor:pointer;}
+.plot-item:active{background:#111;}
+.plot-thumb{width:54px;height:54px;border-radius:8px;overflow:hidden;flex-shrink:0;}
+.plot-thumb img{width:100%;height:100%;object-fit:cover;object-position:top;}
+.plot-thumb-emoji{width:54px;height:54px;border-radius:8px;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;}
+.plot-info{flex:1;min-width:0;}
+.plot-name{font-size:.9rem;font-weight:700;color:#eee;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.plot-talk-count{font-size:.72rem;color:#888;display:flex;align-items:center;gap:4px;}
+.plot-actions{display:flex;gap:8px;align-items:center;}
+.plot-action-icon{width:30px;height:30px;background:none;border:none;color:#555;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;}
+.plot-action-icon:hover{color:#aaa;background:#1a1a1a;}
+
+/* FAB */
+.fab{position:fixed;bottom:76px;right:16px;width:52px;height:52px;background:linear-gradient(135deg,#9933ff,#6600cc);border:none;border-radius:50%;color:#fff;font-size:1.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(153,51,255,.5);z-index:90;transition:transform .15s;}
+.fab:active{transform:scale(.93);}
+
+/* ── エディタ ── */
+.editor-header{padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #1e1e1e;flex-shrink:0;}
+.editor-back{font-size:1.2rem;cursor:pointer;background:none;border:none;color:#ccc;}
+.editor-title{font-size:1rem;font-weight:800;color:#fff;flex:1;}
+.editor-save{background:#9933ff;color:#fff;font-size:.82rem;font-weight:700;padding:7px 16px;border-radius:20px;border:none;cursor:pointer;}
+.editor-body{padding:20px;display:flex;flex-direction:column;gap:20px;padding-bottom:40px;overflow-y:auto;}
+.img-upload-area{width:100%;height:180px;background:#1a1a1a;border:2px dashed #333;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;position:relative;overflow:hidden;}
+.img-upload-area:hover{border-color:#9933ff;}
+.img-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.img-upload-icon{font-size:2.5rem;color:#555;}
+.img-upload-text{font-size:.78rem;color:#666;}
+.field-label{font-size:.75rem;color:#888;font-weight:600;margin-bottom:6px;letter-spacing:.5px;}
+.field-input{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;color:#eee;border-radius:10px;font-size:.9rem;padding:11px 14px;outline:none;font-family:inherit;transition:border-color .2s;}
+.field-input:focus{border-color:#9933ff;}
+.field-input::placeholder{color:#444;}
+textarea.field-input{resize:none;line-height:1.6;}
+.emoji-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.emoji-btn{width:46px;height:46px;font-size:1.4rem;background:#1a1a1a;border:2px solid #2a2a2a;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.emoji-btn.selected{border-color:#9933ff;background:#2a0040;}
+.char-counter{font-size:.7rem;color:#555;text-align:right;margin-top:4px;}
+
+/* ── マイページ ── */
+.mypage-header-banner{background:linear-gradient(135deg,#1a0030,#0d1a3a);padding:28px 20px 20px;display:flex;align-items:center;gap:16px;}
+.mypage-avatar{width:70px;height:70px;border-radius:50%;background:#2a2a2a;border:2px solid #9933ff;display:flex;align-items:center;justify-content:center;font-size:2rem;overflow:hidden;flex-shrink:0;}
+.mypage-avatar img{width:100%;height:100%;object-fit:cover;}
+.mypage-info{flex:1;min-width:0;}
+.mypage-name{font-size:1.1rem;font-weight:800;color:#fff;margin-bottom:2px;}
+.mypage-sub{font-size:.75rem;color:#888;}
+.mypage-follow-row{display:flex;gap:18px;margin-top:8px;}
+.mypage-follow-item{display:flex;flex-direction:column;align-items:center;}
+.mypage-follow-num{font-size:.9rem;font-weight:700;color:#fff;}
+.mypage-follow-label{font-size:.62rem;color:#666;}
+.mypage-edit-btn{margin-top:14px;background:none;border:1px solid #9933ff;color:#9933ff;font-size:.8rem;font-weight:600;padding:7px 20px;border-radius:20px;cursor:pointer;}
+
+.profile-tabs{display:flex;border-bottom:1px solid #1a1a1a;padding:0 16px;}
+.profile-tab{font-size:.82rem;font-weight:600;color:#555;padding:10px 14px 10px 0;cursor:pointer;border-bottom:2px solid transparent;margin-right:4px;}
+.profile-tab.active{color:#fff;border-bottom-color:#9933ff;}
+
+.mypage-menu-list{display:flex;flex-direction:column;padding-bottom:80px;}
+.menu-item{display:flex;align-items:center;gap:12px;padding:16px;border-bottom:1px solid #111;cursor:pointer;}
+.menu-item:active{background:#111;}
+.menu-icon{font-size:1.2rem;width:28px;text-align:center;}
+.menu-label{font-size:.9rem;color:#eee;}
+.menu-arrow{margin-left:auto;color:#444;font-size:.9rem;}
+
+/* ── プロフィール編集 ── */
+.profile-edit-header{padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #1e1e1e;flex-shrink:0;}
+.profile-edit-back{font-size:1.2rem;cursor:pointer;background:none;border:none;color:#ccc;}
+.profile-edit-title{font-size:1rem;font-weight:800;color:#fff;flex:1;}
+.profile-edit-save{background:#9933ff;color:#fff;font-size:.82rem;font-weight:700;padding:7px 16px;border-radius:20px;border:none;cursor:pointer;}
+
+/* ── トークプロフィール編集 ── */
+.tp-edit-header{padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #1e1e1e;flex-shrink:0;}
+.tp-edit-back{font-size:1.2rem;cursor:pointer;background:none;border:none;color:#ccc;}
+.tp-edit-title-text{font-size:1rem;font-weight:800;color:#fff;flex:1;}
+.tp-edit-save-btn{background:#9933ff;color:#fff;font-size:.82rem;font-weight:700;padding:7px 16px;border-radius:20px;border:none;cursor:pointer;}
+.tp-avatar-upload-area{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:6px;}
+.tp-avatar-circle{width:80px;height:80px;border-radius:50%;background:#1a1a1a;border:2px solid #333;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;position:relative;}
+.tp-avatar-circle input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.tp-avatar-label{font-size:.72rem;color:#666;}
+.tp-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #1a1a1a;}
+.tp-toggle-label{font-size:.88rem;color:#eee;}
+.tp-toggle-sub{font-size:.72rem;color:#555;margin-top:2px;}
+.tp-toggle{width:44px;height:26px;background:#333;border-radius:13px;position:relative;cursor:pointer;border:none;flex-shrink:0;transition:background .2s;}
+.tp-toggle-knob{position:absolute;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:left .2s;}
+.tp-delete-btn{width:100%;background:none;border:1px solid #550022;color:#ff5577;border-radius:10px;padding:12px;font-size:.88rem;cursor:pointer;margin-top:10px;}
+
+/* トークプロフィール一覧 */
+.tp-list-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #111;cursor:pointer;}
+.tp-list-item:active{background:#111;}
+.tp-list-avatar{width:48px;height:48px;border-radius:50%;background:#2a2a2a;border:1px solid #333;display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;flex-shrink:0;}
+.tp-list-avatar img{width:100%;height:100%;object-fit:cover;}
+.tp-list-info{flex:1;min-width:0;}
+.tp-list-name{font-size:.88rem;font-weight:700;color:#eee;}
+.tp-list-desc{font-size:.72rem;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.tp-list-badge{font-size:.65rem;background:#9933ff33;color:#9933ff;border:1px solid #9933ff55;border-radius:6px;padding:2px 6px;margin-left:6px;}
+.tp-add-btn{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;}
+.tp-add-icon{width:48px;height:48px;border-radius:50%;background:#1a0030;border:2px dashed #9933ff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#9933ff;flex-shrink:0;}
+.tp-add-label{font-size:.88rem;color:#9933ff;}
+
+/* トースト */
+#toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#333;color:#eee;font-size:.82rem;padding:10px 20px;border-radius:20px;opacity:0;transition:opacity .3s;z-index:500;white-space:nowrap;pointer-events:none;}
+#toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="pages">
+
+<!-- ホーム -->
+<div id="page-home" class="page active">
+  <div class="page-header">
+    <div class="header-title-row">
+      <span class="header-title">ランキング</span>
+      <span class="header-title inactive" onclick="switchTab('search')">検索</span>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="header-icon-btn" title="お知らせ">🔔</button>
+    </div>
+  </div>
+  <div class="rank-subtabs">
+    <div class="rank-subtab active" data-subtab="all" onclick="switchSubtab('all',this)">総合</div>
+    <div class="rank-subtab" data-subtab="new" onclick="switchSubtab('new',this)">新着</div>
+    <div class="rank-subtab" data-subtab="fav" onclick="switchSubtab('fav',this)">お気に入り</div>
+    <button class="gender-filter" id="gender-filter-btn" onclick="openDropdown('gender')">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="5" r="3"/><path d="M7 8v5M4.5 11h5"/></svg>
+      <span id="gender-label">すべて</span>
+    </button>
+  </div>
+  <div class="genre-scroll" id="genre-scroll"></div>
+  <div class="rank-grid" id="rank-grid"></div>
+</div>
+
+<!-- 検索（ダミー） -->
+<div id="page-search" class="page">
+  <div class="page-header">
+    <div class="header-title-row">
+      <span class="header-title inactive" onclick="switchTab('home')">ランキング</span>
+      <span class="header-title">検索</span>
+    </div>
+  </div>
+  <div style="padding:20px;">
+    <input class="field-input" placeholder="キャラを検索..." id="search-input" oninput="renderSearch()">
+  </div>
+  <div class="rank-grid" id="search-results"></div>
+</div>
+
+<!-- トーク -->
+<div id="page-talk" class="page">
+  <div class="page-header">
+    <div class="header-title-row"><span class="header-title">トーク</span></div>
+  </div>
+  <div class="talk-saved-section">
+    <div class="talk-saved-label">最近話したキャラ</div>
+    <div class="talk-saved-scroll" id="talk-saved-scroll"></div>
+  </div>
+  <div class="sort-bar">⏱ 新着順</div>
+  <div class="talk-list-items" id="talk-list-items"></div>
+  <div style="height:80px;"></div>
+</div>
+
+<!-- 作成 -->
+<div id="page-create" class="page">
+  <div class="create-header">
+    <div class="create-title-tabs">
+      <span class="create-title-tab active" data-ctab="mychar" onclick="switchCreateTab('mychar',this)">マイキャラ</span>
+      <span class="create-title-tab" data-ctab="plot" onclick="switchCreateTab('plot',this)">作品</span>
+    </div>
+  </div>
+  <div class="create-stats-bar">
+    <div class="create-stats-label">総トーク数</div>
+    <div class="create-stats-main" id="total-talk-count"><span>0</span></div>
+  </div>
+  <div class="create-pub-tabs">
+    <div class="create-pub-tab active" onclick="switchPubTab('pub',this)">公開</div>
+    <div class="create-pub-tab" onclick="switchPubTab('draft',this)">下書き</div>
+  </div>
+  <div class="plot-list" id="create-list"></div>
+  <button class="fab" onclick="switchTab('editor')" title="新規作成">＋</button>
+</div>
+
+<!-- マイページ -->
+<div id="page-mypage" class="page">
+  <div class="mypage-header-banner" id="mypage-banner">
+    <div class="mypage-avatar" id="mypage-avatar-display">👤</div>
+    <div class="mypage-info">
+      <div class="mypage-name" id="mypage-name-display">ゲスト</div>
+      <div class="mypage-sub" id="mypage-id-display">@user</div>
+    </div>
+  </div>
+  <div style="padding:0 16px 4px;">
+    <div class="mypage-follow-row">
+      <div class="mypage-follow-item">
+        <span class="mypage-follow-num" id="mypage-following">0</span>
+        <span class="mypage-follow-label">フォロー中</span>
+      </div>
+      <div class="mypage-follow-item">
+        <span class="mypage-follow-num" id="mypage-followers">0</span>
+        <span class="mypage-follow-label">フォロワー</span>
+      </div>
+    </div>
+    <button class="mypage-edit-btn" onclick="switchTab('profile-edit')">プロフィール編集</button>
+  </div>
+  <div class="profile-tabs">
+    <div class="profile-tab active" onclick="switchProfileTab('talk',this)">トーク</div>
+    <div class="profile-tab" onclick="switchProfileTab('chars',this)">キャラ</div>
+    <div class="profile-tab" onclick="switchProfileTab('fav',this)">お気に入り</div>
+  </div>
+  <div id="mypage-tab-content"></div>
+  <div style="height:80px;"></div>
+</div>
+
+<!-- プロフィール編集 -->
+<div id="page-profile-edit" class="page" style="display:none;flex-direction:column;">
+  <div class="profile-edit-header">
+    <button class="profile-edit-back" onclick="switchTab('mypage')">←</button>
+    <span class="profile-edit-title">プロフィール編集</span>
+    <button class="profile-edit-save" onclick="saveProfile()">保存</button>
+  </div>
+  <div class="editor-body">
+    <div>
+      <div class="field-label">アバター</div>
+      <div class="mypage-avatar" style="margin:0 auto;width:80px;height:80px;cursor:pointer;position:relative;" id="pe-avatar-circle">
+        <span id="pe-avatar-icon" style="font-size:2.2rem;">👤</span>
+        <input type="file" accept="image/*" onchange="handlePeAvatarUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+      </div>
+    </div>
+    <div>
+      <div class="field-label">表示名</div>
+      <input class="field-input" id="pe-name" placeholder="表示名を入力" maxlength="30">
+    </div>
+    <div>
+      <div class="field-label">ユーザーID（@）</div>
+      <input class="field-input" id="pe-id" placeholder="user123" maxlength="20">
+    </div>
+    <div>
+      <div class="field-label">自己紹介</div>
+      <textarea class="field-input" id="pe-bio" rows="3" placeholder="自己紹介を入力" maxlength="160"></textarea>
+    </div>
+    <div class="divider-block"></div>
+    <!-- トークプロフィール管理 -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="field-label" style="margin-bottom:0;">トークプロフィール</div>
+      </div>
+      <div id="tp-profile-list-in-edit"></div>
+      <div class="tp-add-btn" onclick="openNewTalkProfilePage()">
+        <div class="tp-add-icon">＋</div>
+        <span class="tp-add-label">トークプロフィールを追加</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- トークプロフィール編集 -->
+<div id="page-talk-profile-edit" class="page" style="display:none;flex-direction:column;">
+  <div class="tp-edit-header">
+    <button class="tp-edit-back" onclick="backFromTalkProfileEdit()">←</button>
+    <span class="tp-edit-title-text" id="tp-edit-title">トークプロフィール作成</span>
+    <button class="tp-edit-save-btn" id="tp-save-btn" onclick="saveTalkProfile()">追加</button>
+  </div>
+  <div class="editor-body">
+    <div class="tp-avatar-upload-area">
+      <div class="tp-avatar-circle" id="tp-avatar-circle">
+        <span id="tp-avatar-icon" style="font-size:2rem;color:#666;">👤</span>
+        <input type="file" accept="image/*" onchange="handleTpAvatarUpload(event)">
+      </div>
+      <span class="tp-avatar-label">アバター画像（任意）</span>
+    </div>
+    <div>
+      <div class="field-label">名前</div>
+      <input class="field-input" id="tp-name-input" placeholder="トークで使う名前" maxlength="30">
+    </div>
+    <div>
+      <div class="field-label">表示名（ニックネーム等）</div>
+      <input class="field-input" id="tp-name-display" placeholder="表示用の名前（任意）" maxlength="30">
+    </div>
+    <div>
+      <div class="field-label">自己紹介・設定</div>
+      <textarea class="field-input" id="tp-desc-input" rows="3" placeholder="キャラに伝えるプロフィールや設定" maxlength="200"></textarea>
+    </div>
+    <div class="tp-toggle-row">
+      <div>
+        <div class="tp-toggle-label">基本プロフィールに設定</div>
+        <div class="tp-toggle-sub">トーク時にデフォルトで使用される</div>
+      </div>
+      <button class="tp-toggle" id="tp-default-toggle" onclick="toggleTpDefault()">
+        <span class="tp-toggle-knob" id="tp-default-knob" style="left:2px;"></span>
+      </button>
+    </div>
+    <button class="tp-delete-btn" id="tp-edit-delete-btn" style="display:none;" onclick="deleteTalkProfile()">このプロフィールを削除</button>
+  </div>
+</div>
+
+<!-- エディタ（キャラ作成） -->
+<div id="page-editor" class="page" style="display:none;flex-direction:column;">
+  <div class="editor-header">
+    <button class="editor-back" onclick="switchTab('create')">←</button>
+    <span class="editor-title" id="editor-title-text">キャラを作成</span>
+    <button class="editor-save" onclick="saveChar()">保存</button>
+  </div>
+  <div class="editor-body" id="editor-form">
+    <div>
+      <div class="field-label">キャラ画像</div>
+      <div class="img-upload-area" id="img-upload-area">
+        <span class="img-upload-icon">🖼</span>
+        <span class="img-upload-text">タップして画像を選択</span>
+        <input type="file" accept="image/*" onchange="handleImgUpload(event)">
+      </div>
+    </div>
+    <div>
+      <div class="field-label">アイコン絵文字（画像なし時）</div>
+      <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+    <div>
+      <div class="field-label">名前 <span style="color:#ff3b30;">*</span></div>
+      <input class="field-input" id="char-name" placeholder="キャラの名前" maxlength="40">
+    </div>
+    <div>
+      <div class="field-label">短い紹介文</div>
+      <input class="field-input" id="char-desc" placeholder="一言で説明" maxlength="80">
+    </div>
+    <div>
+      <div class="field-label">タグ（カンマ区切り）</div>
+      <input class="field-input" id="char-tags" placeholder="#現代, #クール">
+    </div>
+    <div>
+      <div class="field-label">世界観・設定</div>
+      <textarea class="field-input" id="char-world" rows="3" placeholder="舞台設定など"></textarea>
+    </div>
+    <div>
+      <div class="field-label">最初のセリフ（挨拶）</div>
+      <textarea class="field-input" id="char-intro" rows="4" placeholder="最初のメッセージ"></textarea>
+    </div>
+    <div>
+      <div class="field-label">システムプロンプト（AIへの指示）<span style="color:#ff3b30;"> *</span></div>
+      <textarea class="field-input" id="char-system" rows="5" placeholder="キャラの人格・口調・設定をAIに指示してください"></textarea>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .pages -->
+
+<!-- タブバー -->
+<div class="tab-bar">
+  <button class="tab-item active" data-tab="home" onclick="switchTab('home')">
+    <span class="tab-icon">🏠</span>ホーム
+  </button>
+  <button class="tab-item" data-tab="search" onclick="switchTab('search')">
+    <span class="tab-icon">🔍</span>検索
+  </button>
+  <button class="tab-item" data-tab="talk" onclick="switchTab('talk')">
+    <span class="tab-icon">💬</span>トーク
+  </button>
+  <button class="tab-item" data-tab="create" onclick="switchTab('create')">
+    <span class="tab-icon">✏️</span>作成
+  </button>
+  <button class="tab-item" data-tab="mypage" onclick="switchTab('mypage')">
+    <span class="tab-icon">👤</span>マイページ
+  </button>
+</div>
+
+<div id="toast"></div>
+
+<!-- ドロップダウン -->
+<div class="dropdown-overlay" id="dd-overlay" onclick="closeDropdown()"></div>
+<div class="dropdown-menu" id="dd-gender" style="display:none;"></div>
+
+<script src="chars.js"></script>
+<script>
+// ================================
+// タブ切り替え
+// ================================
+const TAB_PAGES = ['home','search','talk','create','mypage','editor','profile-edit','talk-profile-edit'];
+function switchTab(id) {
+  TAB_PAGES.forEach(t => {
+    const p = document.getElementById('page-' + t);
+    if (!p) return;
+    if (t === id) { p.style.display = 'flex'; p.style.flexDirection = 'column'; }
+    else { p.style.display = 'none'; }
+  });
+  document.querySelectorAll('.tab-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === id);
+  });
+  if (id === 'talk') renderTalk();
+  if (id === 'create') renderCreate();
+  if (id === 'mypage') renderMypage();
+  if (id === 'profile-edit') loadProfileEdit();
+}
+
+// 初期表示: home
+TAB_PAGES.forEach(t => {
+  const p = document.getElementById('page-' + t);
+  if (p) p.style.display = t === 'home' ? 'flex' : 'none';
+  if (p && t === 'home') p.style.flexDirection = 'column';
+});
+
+// ================================
+// ジャンル・ランキング
+// ================================
+const GENRES = ['すべて','恋愛','異世界','SF','現代','ホラー','コメディ','ファンタジー'];
+let currentGenre = 'すべて';
+let currentSubtab = 'all';
+
+function renderGenreChips() {
+  const el = document.getElementById('genre-scroll');
+  el.innerHTML = GENRES.map(g =>
+    `<div class="genre-chip${g===currentGenre?' active':''}" onclick="selectGenre('${g}')">${g}</div>`
+  ).join('');
+}
+
+function selectGenre(g) {
+  currentGenre = g;
+  renderGenreChips();
+  renderRankGrid();
+}
+
+function switchSubtab(id, el) {
+  currentSubtab = id;
+  document.querySelectorAll('.rank-subtab').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  renderRankGrid();
+}
+
+function filterChars() {
+  const all = getAllChars();
+  let list = Object.values(all);
+  if (currentGenre !== 'すべて') {
+    list = list.filter(c => (c.tags||[]).some(t => t.includes(currentGenre)));
+  }
+  // 新着順はユーザー作成優先
+  if (currentSubtab === 'new') {
+    list = list.filter(c => !CHARACTERS[c.id]);
+  }
+  return list;
+}
+
+function renderRankGrid() {
+  const chars = filterChars();
+  const grid = document.getElementById('rank-grid');
+  if (chars.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#555;padding:40px;font-size:.85rem;">キャラがありません</div>';
+    return;
+  }
+  grid.innerHTML = chars.map((c, i) => {
+    const tc = getTalkCount(c.id);
+    const imgEl = c.img
+      ? `<img class="rank-card-img" src="${c.img}" alt="${c.name}" loading="lazy">`
+      : `<div class="rank-card-emoji">${c.emoji||'🎭'}</div>`;
+    const tags = (c.tags||[]).map(t => `<span class="card-tag-chip">${t}</span>`).join('');
+    return `<div class="rank-card" onclick="goDetail('${c.id}')">
+      ${imgEl}
+      <span class="rank-num">${i+1}</span>
+      <span class="rank-talk-count">💬 ${tc}</span>
+      <div class="rank-card-body">
+        <div class="rank-card-name">${c.name}</div>
+        <div class="rank-card-desc">${c.desc||''}</div>
+        <div class="rank-card-tags">${tags}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSearch() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const all = Object.values(getAllChars());
+  const hits = q ? all.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    (c.desc||'').toLowerCase().includes(q) ||
+    (c.tags||[]).some(t => t.toLowerCase().includes(q))
+  ) : all;
+  const grid = document.getElementById('search-results');
+  if (hits.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#555;padding:40px;font-size:.85rem;">見つかりませんでした</div>';
+    return;
+  }
+  grid.innerHTML = hits.map((c,i) => {
+    const tc = getTalkCount(c.id);
+    const imgEl = c.img
+      ? `<img class="rank-card-img" src="${c.img}" alt="${c.name}" loading="lazy">`
+      : `<div class="rank-card-emoji">${c.emoji||'🎭'}</div>`;
+    const tags = (c.tags||[]).map(t => `<span class="card-tag-chip">${t}</span>`).join('');
+    return `<div class="rank-card" onclick="goDetail('${c.id}')">
+      ${imgEl}
+      <span class="rank-talk-count">💬 ${tc}</span>
+      <div class="rank-card-body">
+        <div class="rank-card-name">${c.name}</div>
+        <div class="rank-card-desc">${c.desc||''}</div>
+        <div class="rank-card-tags">${tags}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function goDetail(id) {
+  location.href = 'detail.html?id=' + encodeURIComponent(id);
+}
+
+// ================================
+// トーク
+// ================================
+function renderTalk() {
+  const all = getAllChars();
+  const ids = Object.keys(all);
+  const withHistory = ids.filter(id => localStorage.getItem('chat_history_' + id));
+
+  // 最近話したキャラ
+  const savedScroll = document.getElementById('talk-saved-scroll');
+  if (withHistory.length === 0) {
+    savedScroll.innerHTML = '<div style="font-size:.78rem;color:#444;padding:4px 0;">まだ会話がありません</div>';
+  } else {
+    savedScroll.innerHTML = withHistory.map(id => {
+      const c = all[id];
+      const avatarEl = c.img
+        ? `<div class="talk-saved-avatar"><img src="${c.img}" alt="${c.name}"></div>`
+        : `<div class="talk-saved-avatar" style="display:flex;align-items:center;justify-content:center;font-size:1.6rem;background:#1a1a1a;">${c.emoji||'🎭'}</div>`;
+      return `<div class="talk-saved-item" onclick="goChat('${id}')">
+        ${avatarEl}
+        <div class="talk-saved-name">${c.name}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // トーク一覧
+  const listEl = document.getElementById('talk-list-items');
+  if (withHistory.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;font-size:.85rem;">キャラと話してみよう</div>';
+    return;
+  }
+  listEl.innerHTML = withHistory.map(id => {
+    const c = all[id];
+    let lastMsg = '';
+    try {
+      const h = JSON.parse(localStorage.getItem('chat_history_' + id)||'[]');
+      if (h.length > 0) lastMsg = h[h.length-1].content.slice(0,40);
+    } catch(e) {}
+    const avatarEl = c.img
+      ? `<div class="talk-avatar"><img src="${c.img}" alt="${c.name}"></div>`
+      : `<div class="talk-avatar-emoji">${c.emoji||'🎭'}</div>`;
+    return `<div class="talk-item" onclick="goChat('${id}')">
+      ${avatarEl}
+      <div class="talk-info">
+        <div class="talk-name">${c.name}</div>
+        <div class="talk-preview">${lastMsg||'会話を始めよう'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function goChat(id) {
+  location.href = 'chat.html?id=' + encodeURIComponent(id);
+}
+
+// ================================
+// 作成
+// ================================
+function renderCreate() {
+  const userChars = getUserChars();
+  const total = Object.keys(getAllChars()).reduce((s,id) => s + getTalkCount(id), 0);
+  const tcEl = document.getElementById('total-talk-count');
+  if (tcEl) tcEl.innerHTML = `<span>${total}</span> トーク`;
+
+  const listEl = document.getElementById('create-list');
+  if (userChars.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;font-size:.85rem;">まだキャラを作っていません<br><br><span style="color:#9933ff;cursor:pointer;" onclick="switchTab(\'editor\')">＋ キャラを作成</span></div>';
+    return;
+  }
+  listEl.innerHTML = userChars.map(c => {
+    const tc = getTalkCount(c.id);
+    const thumbEl = c.img
+      ? `<div class="plot-thumb"><img src="${c.img}" alt="${c.name}"></div>`
+      : `<div class="plot-thumb-emoji">${c.emoji||'🎭'}</div>`;
+    return `<div class="plot-item">
+      ${thumbEl}
+      <div class="plot-info" onclick="goDetail('${c.id}')">
+        <div class="plot-name">${c.name}</div>
+        <div class="plot-talk-count">💬 ${tc} トーク</div>
+      </div>
+      <div class="plot-actions">
+        <button class="plot-action-icon" onclick="editChar('${c.id}')" title="編集">✏️</button>
+        <button class="plot-action-icon" onclick="deleteChar('${c.id}')" title="削除">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getUserChars() {
+  try { return JSON.parse(localStorage.getItem('user_chars') || '[]'); } catch(e) { return []; }
+}
+
+function switchCreateTab(id, el) {
+  document.querySelectorAll('.create-title-tab').forEach(e => e.classList.toggle('active', e.dataset.ctab === id));
+}
+
+function switchPubTab(id, el) {
+  document.querySelectorAll('.create-pub-tab').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ================================
+// エディタ
+// ================================
+const EMOJIS = ['🎭','😈','⚔️','🔫','🏰','🤖','👑','🐉','🌸','🌙','⚡','🔥','❄️','🌊','🌹','🦅'];
+let editorEmoji = '🎭';
+let editorImg = null;
+let editCharId = null;
+
+function renderEmojiGrid() {
+  const grid = document.getElementById('emoji-grid');
+  grid.innerHTML = EMOJIS.map(e =>
+    `<button class="emoji-btn${e===editorEmoji?' selected':''}" onclick="selectEmoji('${e}')">${e}</button>`
+  ).join('');
+}
+
+function selectEmoji(e) {
+  editorEmoji = e;
+  renderEmojiGrid();
+}
+
+function handleImgUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev2 => {
+    editorImg = ev2.target.result;
+    const area = document.getElementById('img-upload-area');
+    area.innerHTML = `<img src="${editorImg}" style="width:100%;height:100%;object-fit:cover;object-position:top;border-radius:14px;" /><input type="file" accept="image/*" onchange="handleImgUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveChar() {
+  const name = document.getElementById('char-name').value.trim();
+  if (!name) { showToast('名前を入力してください'); return; }
+  const system = document.getElementById('char-system').value.trim();
+  if (!system) { showToast('システムプロンプトを入力してください'); return; }
+  const tags = document.getElementById('char-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const c = {
+    id: editCharId || ('user_' + Date.now()),
+    name,
+    desc: document.getElementById('char-desc').value.trim(),
+    tags,
+    world: document.getElementById('char-world').value.trim(),
+    intro: document.getElementById('char-intro').value.trim(),
+    system,
+    emoji: editorEmoji,
+    img: editorImg,
+  };
+  const arr = getUserChars();
+  if (editCharId) {
+    const idx = arr.findIndex(x => x.id === editCharId);
+    if (idx >= 0) arr[idx] = c; else arr.push(c);
+  } else {
+    arr.push(c);
+  }
+  localStorage.setItem('user_chars', JSON.stringify(arr));
+  editCharId = null;
+  showToast(editCharId ? '保存しました' : '作成しました');
+  switchTab('create');
+}
+
+function editChar(id) {
+  const all = getAllChars();
+  const c = all[id]; if (!c) return;
+  editCharId = id;
+  editorEmoji = c.emoji || '🎭';
+  editorImg = c.img || null;
+  document.getElementById('editor-title-text').textContent = 'キャラを編集';
+  document.getElementById('char-name').value = c.name || '';
+  document.getElementById('char-desc').value = c.desc || '';
+  document.getElementById('char-tags').value = (c.tags||[]).join(', ');
+  document.getElementById('char-world').value = c.world || '';
+  document.getElementById('char-intro').value = c.intro || '';
+  document.getElementById('char-system').value = c.system || '';
+  const area = document.getElementById('img-upload-area');
+  if (editorImg) {
+    area.innerHTML = `<img src="${editorImg}" style="width:100%;height:100%;object-fit:cover;object-position:top;border-radius:14px;" /><input type="file" accept="image/*" onchange="handleImgUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  } else {
+    area.innerHTML = `<span class="img-upload-icon">🖼</span><span class="img-upload-text">タップして画像を選択</span><input type="file" accept="image/*" onchange="handleImgUpload(event)">`;
+  }
+  renderEmojiGrid();
+  switchTab('editor');
+}
+
+function deleteChar(id) {
+  if (!confirm('このキャラを削除しますか？')) return;
+  let arr = getUserChars();
+  arr = arr.filter(c => c.id !== id);
+  localStorage.setItem('user_chars', JSON.stringify(arr));
+  localStorage.removeItem('chat_history_' + id);
+  localStorage.removeItem('talk_count_' + id);
+  showToast('削除しました');
+  renderCreate();
+}
+
+// ================================
+// マイページ
+// ================================
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem('my_profile') || 'null'); } catch(e) { return null; }
+}
+function applyProfile(p) {
+  if (!p) return;
+  const nameEl = document.getElementById('mypage-name-display');
+  const idEl = document.getElementById('mypage-id-display');
+  const avEl = document.getElementById('mypage-avatar-display');
+  if (nameEl) nameEl.textContent = p.name || 'ゲスト';
+  if (idEl) idEl.textContent = '@' + (p.uid || 'user');
+  if (avEl) {
+    if (p.avatar) {
+      avEl.innerHTML = `<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    } else {
+      avEl.textContent = '👤';
+    }
+  }
+}
+
+function renderMypage() {
+  applyProfile(loadProfile());
+  renderMypageTabContent('talk');
+}
+
+function switchProfileTab(id, el) {
+  document.querySelectorAll('.profile-tab').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  renderMypageTabContent(id);
+}
+
+function renderMypageTabContent(tab) {
+  const el = document.getElementById('mypage-tab-content');
+  if (tab === 'talk') {
+    const ids = Object.keys(getAllChars()).filter(id => localStorage.getItem('chat_history_' + id));
+    if (ids.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:#555;padding:40px;font-size:.85rem;">まだ会話がありません</div>';
+      return;
+    }
+    el.innerHTML = ids.map(id => {
+      const c = getAllChars()[id];
+      const tc = getTalkCount(id);
+      const av = c.img ? `<div class="talk-avatar"><img src="${c.img}" alt="${c.name}"></div>` : `<div class="talk-avatar-emoji">${c.emoji||'🎭'}</div>`;
+      return `<div class="talk-item" onclick="goChat('${id}')">
+        ${av}
+        <div class="talk-info">
+          <div class="talk-name">${c.name}</div>
+          <div class="talk-preview">💬 ${tc} トーク</div>
+        </div>
+      </div>`;
+    }).join('');
+  } else if (tab === 'chars') {
+    const uc = getUserChars();
+    if (uc.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:#555;padding:40px;font-size:.85rem;">作成したキャラなし</div>';
+      return;
+    }
+    el.innerHTML = uc.map(c => {
+      const av = c.img ? `<div class="talk-avatar"><img src="${c.img}" alt="${c.name}"></div>` : `<div class="talk-avatar-emoji">${c.emoji||'🎭'}</div>`;
+      return `<div class="talk-item" onclick="goDetail('${c.id}')">
+        ${av}
+        <div class="talk-info">
+          <div class="talk-name">${c.name}</div>
+          <div class="talk-preview">${c.desc||''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    el.innerHTML = '<div style="text-align:center;color:#555;padding:40px;font-size:.85rem;">お気に入りなし</div>';
+  }
+}
+
+// ================================
+// プロフィール編集
+// ================================
+let peAvatarData = null;
+
+function loadProfileEdit() {
+  const p = loadProfile();
+  if (!p) { peAvatarData = null; renderTpListInEdit(); return; }
+  document.getElementById('pe-name').value = p.name || '';
+  document.getElementById('pe-id').value = p.uid || '';
+  document.getElementById('pe-bio').value = p.bio || '';
+  peAvatarData = p.avatar || null;
+  const circle = document.getElementById('pe-avatar-circle');
+  if (peAvatarData) {
+    circle.innerHTML = `<img src="${peAvatarData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><input type="file" accept="image/*" onchange="handlePeAvatarUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  } else {
+    circle.innerHTML = `<span id="pe-avatar-icon" style="font-size:2.2rem;">👤</span><input type="file" accept="image/*" onchange="handlePeAvatarUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  }
+  renderTpListInEdit();
+}
+
+function handlePeAvatarUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e2 => {
+    peAvatarData = e2.target.result;
+    const circle = document.getElementById('pe-avatar-circle');
+    circle.innerHTML = `<img src="${peAvatarData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><input type="file" accept="image/*" onchange="handlePeAvatarUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveProfile() {
+  const p = {
+    name: document.getElementById('pe-name').value.trim() || 'ゲスト',
+    uid: document.getElementById('pe-id').value.trim() || 'user',
+    bio: document.getElementById('pe-bio').value.trim(),
+    avatar: peAvatarData,
+  };
+  localStorage.setItem('my_profile', JSON.stringify(p));
+  applyProfile(p);
+  showToast('保存しました');
+  switchTab('mypage');
+}
+
+// ================================
+// トークプロフィール
+// ================================
+let tpEditIndex = -1;
+let tpDefaultOn = false;
+
+function loadTalkProfiles() {
+  try { return JSON.parse(localStorage.getItem('talk_profiles') || '[]'); } catch(e) { return []; }
+}
+function saveTalkProfilesData(arr) { localStorage.setItem('talk_profiles', JSON.stringify(arr)); }
+
+function renderTpListInEdit() {
+  const profiles = loadTalkProfiles();
+  const active = getActiveTalkProfile();
+  const el = document.getElementById('tp-profile-list-in-edit');
+  if (profiles.length === 0) {
+    el.innerHTML = '<div style="font-size:.78rem;color:#555;margin-bottom:10px;">トークプロフィールなし</div>';
+    return;
+  }
+  el.innerHTML = profiles.map((p, i) => {
+    const isActive = active && active.id === p.id;
+    const avEl = p.avatar
+      ? `<div class="tp-list-avatar"><img src="${p.avatar}" alt="${p.name}"></div>`
+      : `<div class="tp-list-avatar">👤</div>`;
+    return `<div class="tp-list-item" onclick="openEditTalkProfile(${i})">
+      ${avEl}
+      <div class="tp-list-info">
+        <div class="tp-list-name">${p.name}${isActive ? '<span class="tp-list-badge">基本</span>' : ''}</div>
+        <div class="tp-list-desc">${p.desc||'説明なし'}</div>
+      </div>
+      <span style="color:#555;font-size:.8rem;">›</span>
+    </div>`;
+  }).join('');
+}
+
+function getActiveTalkProfile() {
+  try { return JSON.parse(localStorage.getItem('active_talk_profile') || 'null'); } catch(e) { return null; }
+}
+
+function openNewTalkProfilePage() {
+  tpEditIndex = -1;
+  tpDefaultOn = false;
+  document.getElementById('tp-edit-title').textContent = 'トークプロフィール作成';
+  document.getElementById('tp-save-btn').textContent = '追加';
+  document.getElementById('tp-edit-delete-btn').style.display = 'none';
+  document.getElementById('tp-name-input').value = '';
+  document.getElementById('tp-name-display').value = '';
+  document.getElementById('tp-desc-input').value = '';
+  const circle = document.getElementById('tp-avatar-circle');
+  circle.innerHTML = '<span id="tp-avatar-icon" style="font-size:2rem;color:#666;">👤</span><input type="file" accept="image/*" onchange="handleTpAvatarUpload(event)">';
+  updateTpToggle();
+  switchTab('talk-profile-edit');
+}
+
+function openEditTalkProfile(index) {
+  const profiles = loadTalkProfiles();
+  if (index < 0 || index >= profiles.length) return;
+  const p = profiles[index];
+  tpEditIndex = index;
+  tpDefaultOn = !!p.isDefault;
+  document.getElementById('tp-edit-title').textContent = 'トークプロフィール編集';
+  document.getElementById('tp-save-btn').textContent = '保存';
+  document.getElementById('tp-edit-delete-btn').style.display = 'block';
+  document.getElementById('tp-name-input').value = p.name || '';
+  document.getElementById('tp-name-display').value = p.nameDisplay || '';
+  document.getElementById('tp-desc-input').value = p.desc || '';
+  const circle = document.getElementById('tp-avatar-circle');
+  if (p.avatar) {
+    circle.innerHTML = `<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><input type="file" accept="image/*" onchange="handleTpAvatarUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  } else {
+    circle.innerHTML = '<span id="tp-avatar-icon" style="font-size:2rem;color:#666;">👤</span><input type="file" accept="image/*" onchange="handleTpAvatarUpload(event)">';
+  }
+  updateTpToggle();
+  switchTab('talk-profile-edit');
+}
+
+function updateTpToggle() {
+  const toggle = document.getElementById('tp-default-toggle');
+  const knob = document.getElementById('tp-default-knob');
+  toggle.style.background = tpDefaultOn ? '#9933ff' : '#333';
+  knob.style.left = tpDefaultOn ? '20px' : '2px';
+}
+
+function toggleTpDefault() {
+  tpDefaultOn = !tpDefaultOn;
+  updateTpToggle();
+}
+
+function handleTpAvatarUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e2 => {
+    const circle = document.getElementById('tp-avatar-circle');
+    circle.innerHTML = `<img src="${e2.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"><input type="file" accept="image/*" onchange="handleTpAvatarUpload(event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveTalkProfile() {
+  const name = document.getElementById('tp-name-input').value.trim();
+  if (!name) { showToast('名前を入力してください'); return; }
+  const avatarImg = document.getElementById('tp-avatar-circle').querySelector('img');
+  const avatar = avatarImg ? avatarImg.src : null;
+  const profiles = loadTalkProfiles();
+  if (tpDefaultOn) profiles.forEach(p => p.isDefault = false);
+  const profile = {
+    id: tpEditIndex >= 0 ? profiles[tpEditIndex].id : ('tp_' + Date.now()),
+    name,
+    nameDisplay: document.getElementById('tp-name-display').value.trim(),
+    desc: document.getElementById('tp-desc-input').value.trim(),
+    avatar,
+    isDefault: tpDefaultOn,
+  };
+  if (tpEditIndex >= 0) {
+    profiles[tpEditIndex] = profile;
+  } else {
+    profiles.push(profile);
+  }
+  saveTalkProfilesData(profiles);
+  if (tpDefaultOn) localStorage.setItem('active_talk_profile', JSON.stringify(profile));
+  showToast(tpEditIndex >= 0 ? '保存しました' : '追加しました');
+  switchTab('profile-edit');
+  loadProfileEdit();
+}
+
+function deleteTalkProfile() {
+  if (!confirm('このトークプロフィールを削除しますか？')) return;
+  const profiles = loadTalkProfiles();
+  const deleted = profiles[tpEditIndex];
+  profiles.splice(tpEditIndex, 1);
+  saveTalkProfilesData(profiles);
+  try {
+    const active = JSON.parse(localStorage.getItem('active_talk_profile') || 'null');
+    if (active && active.id === deleted.id) localStorage.removeItem('active_talk_profile');
+  } catch(e) {}
+  showToast('削除しました');
+  switchTab('profile-edit');
+  loadProfileEdit();
+}
+
+function backFromTalkProfileEdit() {
+  switchTab('profile-edit');
+  loadProfileEdit();
+}
+
+// ドロップダウン
+function openDropdown(type) {
+  const ov = document.getElementById('dd-overlay');
+  const btn = document.getElementById('gender-filter-btn');
+  const menu = document.getElementById('dd-gender');
+  const rect = btn.getBoundingClientRect();
+  menu.style.left = (rect.left) + 'px';
+  menu.style.top = (rect.bottom + 6) + 'px';
+  menu.style.display = 'block';
+  ov.classList.add('show');
+  const opts = ['すべて','男性キャラ','女性キャラ'];
+  menu.innerHTML = opts.map(o =>
+    `<div class="dropdown-item${document.getElementById('gender-label').textContent===o?' active':''}" onclick="selectGender('${o}')">${o}</div>`
+  ).join('');
+}
+function closeDropdown() {
+  document.getElementById('dd-overlay').classList.remove('show');
+  document.getElementById('dd-gender').style.display = 'none';
+}
+function selectGender(v) {
+  document.getElementById('gender-label').textContent = v;
+  closeDropdown();
+  renderRankGrid();
+}
+
+// URL action処理
+(function() {
+  const action = new URLSearchParams(location.search).get('action');
+  if (action === 'new_talk_profile') {
+    window.addEventListener('load', () => {
+      switchTab('mypage');
+      setTimeout(() => {
+        switchTab('profile-edit');
+        loadProfileEdit();
+        setTimeout(openNewTalkProfilePage, 100);
+      }, 100);
+    });
+  }
+})();
+
+// トースト
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// 初期化
+(function init() {
+  const p = loadProfile();
+  if (p) applyProfile(p);
+  renderGenreChips();
+  renderRankGrid();
+  renderEmojiGrid();
+})();
+</script>
+</body>
+</html>
